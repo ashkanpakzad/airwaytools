@@ -1,0 +1,29 @@
+% By Ashkan Pakzad 4th July 2019 (ashkan.pakzad.13@ucl.ac.uk)
+
+%% Params
+imagename='N1.nii.gz';
+segname='N1_lumen.nii.gz';
+
+%% Load data
+V = double(niftiread(image_name));
+I = niftiinfo(image_name);
+S = logical(niftiread(segmenation_name));
+
+%% Skeletonise lumen segmentation & graph it
+skel = bwskel(S);
+
+[A,node,link] = Skel2Graph3D(skel,0); % dependent function
+G = graph(A);
+
+%% Find carina
+% last node APPARENTLY corresponds to top of trachea.
+C_Gidx = neighbors(G,length(A)); % carina node
+
+
+%% tools to Graph plot
+% figure
+% G = graph(A);
+% h = plot(G);
+% highlight(h, 115);
+
+
