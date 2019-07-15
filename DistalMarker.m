@@ -31,8 +31,10 @@ terminal_idx = terminal_idx(1:end-1);
 %% Convert to voxel list and create logical array
 terminal_vox = [node(terminal_idx).idx];
 
+[I,J,K] = ind2sub(size(S), terminal_vox);
+
 distal = zeros(size(S));
-distal(terminal_vox) = 1;
+distal(J,I,K) = 1; % indicies of I and J must be swapped to for CT space.
 
 %% Save distal logical array
 niftiwrite(double(distal), 'N1_distal')
@@ -43,5 +45,7 @@ figure
 G = graph(A);
 h = plot(G);
 highlight(h, C_Gidx); % highlight carina
+highlight(h, terminal_idx); % highlight carina
+
 
 
