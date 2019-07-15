@@ -33,8 +33,10 @@ terminal_vox = [node(terminal_idx).idx];
 
 [I,J,K] = ind2sub(size(S), terminal_vox);
 
+ind_idx = sub2ind(size(S),J,I,K);
+
 distal = zeros(size(S));
-distal(J,I,K) = 1; % indicies of I and J must be swapped to for CT space.
+distal(ind_idx) = 1; % indicies of I and J must be swapped to for CT space.
 
 %% Save distal logical array
 niftiwrite(double(distal), 'N1_distal')
