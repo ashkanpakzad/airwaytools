@@ -1,4 +1,4 @@
-% By Ashkan Pakzad on 9th July 2019
+% By Ashkan Pakzad 9th July 2019 (ashkan.pakzad.13@ucl.ac.uk)
 
 % Script to segment airway walls given an airway lumen input
 
