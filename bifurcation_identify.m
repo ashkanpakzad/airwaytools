@@ -89,8 +89,10 @@ bifurcation_points = arc_length(bifurcation_idx);
 new_bifurcation_idx = zeros(size(bifurcation_idx));
 for i = 1:length(bifurcation_idx)
     current_idx = bifurcation_idx(i);
+    % identify nearest peak
     [min_val, min_idx] = min(abs(raw_locs - bifurcation_idx(i)));
     try
+        % consider if nearer peaks are more likely to rep. bifurcation
         [~, max_idx] = max(raw_pks(min_idx-3:min_idx+3));
         if max_idx > 4
             idx = min_idx - 4 + max_idx;
@@ -102,6 +104,7 @@ for i = 1:length(bifurcation_idx)
     catch
          idx = min_idx;
     end
+    raw_pks(idx) = 0; % prevents same peak being chosen twice.
     new_bifurcation_idx(i) = raw_locs(idx);
     % consider something here incase finding peak fails
 end
