@@ -11,7 +11,8 @@ s_raw = sturct_to_save.tapering_seg_image.resample_image;
 arc_length = sturct_to_save.tapering_raw_image.arclegth;
 area_info = sturct_to_save.tapering_raw_image.area_results;
 lumen_area = [area_info.phyiscal_area];
-wall_area = [area_info.phyiscal_area_wall];
+%wall_area = [area_info.phyiscal_area_wall];
+
 %% remove bronchi at carina
 removal = 50;
 s_raw = s_raw(:,:,removal:end);
@@ -109,6 +110,8 @@ for i = 1:length(bifurcation_idx)
     % consider something here incase finding peak fails
 end
 
+%% visualise new peak bifurcations and original idx
+
 figure
 plot(arc_length,lumen_area)
 hold on
@@ -130,40 +133,50 @@ upper_exclude = zeros(size(new_bifurcation_idx));
 for i = 1:length(new_bifurcation_idx)
     
     pck_idx = new_bifurcation_idx(i);
-    data_hwidth = 50;% initial peak width
-    % initiate loop variables
-    gof_n = 0;
-    gof_np1 = 0.0001;
-    int = 1; % inteval width reduction
-
-    while gof_n < gof_np1 || gof_n < 0.2
-        try % save prev. result for display.
-            n_fitresult = fitresult; 
-            n_data_hwidth = data_hwidth;
-            n_x_data = x_data;
-            n_vals = vals;
-            catch
-        end
-        % reduce peak width 
-        data_hwidth = data_hwidth - int;
-        % normalise data window
+    try
+        data_hwidth = 50;% initial peak width
+        % initiate loop variables
+        gof_n = 0;
+        gof_np1 = 0.0001;
+        int = 1; % inteval width reduction
         x_data = mat2gray(lumen_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
-        % equally spaced values
-        vals = [1:length(x_data)]';
-        
-        % fit gaussian with fixed mean at centre
-        options = fitoptions('gauss1');
-        options.Lower = [-inf data_hwidth 0];
-        options.Upper = [inf data_hwidth inf];
-        [fitresult, gof] = fit(vals, x_data, 'gauss1', options);
-        
-        % assign values for next loop
-        gof_n = gof_np1; 
-        gof_np1 = gof.rsquare;
-        %disp(data_hwidth);
+        [~, x_data_pck_idx] = max(x_data);
 
+        while x_data_pck_idx ~= data_hwidth+1
+            [~, x_data_pck_idx] = max(x_data);
+            data_hwidth = data_hwidth - int;
+        end
+
+        while gof_n < gof_np1 || gof_n < 0.2
+            try % save prev. result for display.
+                n_fitresult = fitresult; 
+                n_data_hwidth = data_hwidth;
+                n_x_data = x_data;
+                n_vals = vals;
+                catch
+            end
+            % reduce peak width 
+            data_hwidth = data_hwidth - int;
+            % normalise data window
+            x_data = mat2gray(lumen_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
+            % equally spaced values
+            vals = [1:length(x_data)]';
+
+            % fit gaussian with fixed mean at centre
+            options = fitoptions('gauss1');
+            options.Lower = [-inf data_hwidth+1 0];
+            options.Upper = [inf data_hwidth+1 inf];
+            [fitresult, gof] = fit(vals, x_data, 'gauss1', options);
+
+            % assign values for next loop
+            gof_n = gof_np1; 
+            gof_np1 = gof.rsquare;
+            %disp(data_hwidth);
+
+        end
+    catch
+        n_data_hwidth = 3; % if fail to fit, remove 7 points around bifurcation
     end
-
     lower_exclude(i) = pck_idx-n_data_hwidth;
     upper_exclude(i) = pck_idx+n_data_hwidth;
 end
@@ -224,7 +237,6 @@ end
 
 %dist = dist + 10;
 
-
 %% split taper data into segments
 
 %% Find path voxels
@@ -251,8 +263,6 @@ plot3(strstopI(1),strstopJ(1),strstopK(1),'mo','MarkerSize',20)
 plot3(strstopI(end),strstopJ(end),strstopK(end),'mo','MarkerSize',20)
 view(90,0)
 
-
-
 %% extract
 arc_length = sturct_to_save.tapering_raw_image.arclegth;
 area_info = sturct_to_save.tapering_raw_image.area_results;
@@ -272,4 +282,3 @@ for i = 1:numel(arc_length)
 end
 lumen_major = max(lumen_radius);
 wall_major = max(wall_radius);
-
