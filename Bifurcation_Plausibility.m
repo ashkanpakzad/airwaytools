@@ -18,7 +18,7 @@ for i = 2:length(Path)-1
     link_len(i-1) = numel([link(off_branch_link).point]);
 end
 
-[~,L,~,~] = isoutlier(link_len);
-true_bifurcations = link_len > L;
+%[~,L,~,~] = isoutlier(link_len,'mean');
+true_bifurcations = link_len > 3;
 end
     
