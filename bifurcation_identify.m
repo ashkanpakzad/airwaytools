@@ -3,11 +3,15 @@
 % attempt to identify bifurcations from tapering segmentation.
 
 %% load tapering data & Segmentation
-load('P_N1_raw_image_CT_nifti_A_22195509.mat')
+load('P_N1_raw_image_CT_nifti_A_24287940.mat')
 segname = 'N1_raw_image_lumen_seg.nii';
 S = logical(niftiread(segname)); % NOTE upper and lower s, S
 s_raw = sturct_to_save.tapering_seg_image.resample_image;
 
+arc_length = sturct_to_save.tapering_raw_image.arclegth;
+area_info = sturct_to_save.tapering_raw_image.area_results;
+lumen_area = [area_info.phyiscal_area];
+wall_area = [area_info.phyiscal_area_wall];
 %% remove bronchi at carina
 removal = 50;
 s_raw = s_raw(:,:,removal:end);
@@ -61,7 +65,7 @@ stop_idx = s_all_term_idx(stop_zidx);
 
 sP = shortestpath(sG,start_idx,stop_idx); % path for airway
 
-%% remove false bifurcations 
+%% remove false bifurcations by analysing skeleton
 % Func. to find plausible bifurcations
 [true_bifurcations, ~] = Bifurcation_Plausibility(sP, snode, slink);
 % extract plausible bifurcations
@@ -74,54 +78,18 @@ sP_plaus = [sP(1), sP_plaus, sP(end)];
 false_counter = sum(~true_bifurcations);
 
 %% identify arc_length distances for path bifurcation nodes
-arc_length = sturct_to_save.tapering_raw_image.arclegth;
 path_zind = round([snode(sP_plaus).comz]);
 %[pathJ,pathI,pathK] = ind2sub(size(s_skel),path_ind);
 path_zind = path_zind(2:end-1); % remove start and end
 bifurcation_idx = path_zind+removal;
 bifurcation_points = arc_length(bifurcation_idx);
 
-%% visualise bifucation points against area from tapering
-smooth_area = smooth(sturct_to_save.tapering_raw_image.arclegth,sturct_to_save.tapering_raw_image.area_results.phyiscal_area,0.05,'sgolay',5);
-
-[pks,locs] = findpeaks(smooth_area);
-
-figure
-plot(sturct_to_save.tapering_raw_image.arclegth,...
-     sturct_to_save.tapering_raw_image.area_results.phyiscal_area)
-hold on
-plot(sturct_to_save.tapering_raw_image.arclegth, smooth_area)
-plot(bifurcation_points, sturct_to_save.tapering_raw_image.area_results.phyiscal_area(bifurcation_idx), 'r.', 'MarkerSize', 14)
-plot(sturct_to_save.tapering_raw_image.arclegth(locs), pks, 'v', 'MarkerSize', 14)
-plot(sturct_to_save.tapering_raw_image.arclegth(new_bifurcation_idx),sturct_to_save.tapering_raw_image.area_results.phyiscal_area(new_bifurcation_idx), '^')
-xlabel('Arc Length (mm)')
-ylabel('Area (mm^2)')
-legend('Raw Area', 'Smooth Area', 'Seg. Bifurcation Points', 'Local Maxima')
-
-%% identify bifurcations with local maxima peaks on smoth
+%% identify bifurcations with local maxima peaks raw
+[raw_pks,raw_locs] = findpeaks(lumen_area);
 new_bifurcation_idx = zeros(size(bifurcation_idx));
 for i = 1:length(bifurcation_idx)
     current_idx = bifurcation_idx(i);
-    [min_val, min_idx] = min(abs(locs - bifurcation_idx(i)));
-    new_bifurcation_idx(i) = locs(min_idx);
-    % consider something here incase finding peak fails
-end
-
-figure
-plot(sturct_to_save.tapering_raw_image.arclegth,...
-     sturct_to_save.tapering_raw_image.area_results.phyiscal_area)
-hold on
-plot(sturct_to_save.tapering_raw_image.arclegth(new_bifurcation_idx),sturct_to_save.tapering_raw_image.area_results.phyiscal_area(new_bifurcation_idx), '^')
-xlabel('Arc Length (mm)')
-ylabel('Area (mm^2)')
-legend('Raw Area','Seg. Pks. Bifurcation Points')
-
-%% identify bifurcations with smooth local maxima peaks raw
-[raw_pks,raw_locs] = findpeaks(sturct_to_save.tapering_raw_image.area_results.phyiscal_area);
-new_new_bifurcation_idx = zeros(size(new_bifurcation_idx));
-for i = 1:length(new_bifurcation_idx)
-    current_idx = new_bifurcation_idx(i);
-    [min_val, min_idx] = min(abs(raw_locs - new_bifurcation_idx(i)));
+    [min_val, min_idx] = min(abs(raw_locs - bifurcation_idx(i)));
     try
         [~, max_idx] = max(raw_pks(min_idx-3:min_idx+3));
         if max_idx > 4
@@ -134,30 +102,31 @@ for i = 1:length(new_bifurcation_idx)
     catch
          idx = min_idx;
     end
-    new_new_bifurcation_idx(i) = raw_locs(idx);
+    new_bifurcation_idx(i) = raw_locs(idx);
     % consider something here incase finding peak fails
 end
 
 figure
-plot(sturct_to_save.tapering_raw_image.arclegth,...
-     sturct_to_save.tapering_raw_image.area_results.phyiscal_area)
+plot(arc_length,lumen_area)
 hold on
-plot(sturct_to_save.tapering_raw_image.arclegth(new_new_bifurcation_idx),sturct_to_save.tapering_raw_image.area_results.phyiscal_area(new_new_bifurcation_idx), '^')
+plot(bifurcation_points, lumen_area(bifurcation_idx), 'r.', 'MarkerSize', 14)
+plot(arc_length(new_bifurcation_idx),lumen_area(new_bifurcation_idx), '^')
 xlabel('Arc Length (mm)')
 ylabel('Area (mm^2)')
 legend('Raw Area','new new Bifurcation Points')
 
-
 %% Remove Bifurcation Points
+
+% most computationally intensive.
 
 % extract points around first peak
 %indices for exclusion between lower and upper point at each bifurcation.
-lower_exclude = zeros(size(new_new_bifurcation_idx));
-upper_exclude = zeros(size(new_new_bifurcation_idx));
+lower_exclude = zeros(size(new_bifurcation_idx));
+upper_exclude = zeros(size(new_bifurcation_idx));
 
-for i = 1:length(new_new_bifurcation_idx)
+for i = 1:length(new_bifurcation_idx)
     
-    pck_idx = new_new_bifurcation_idx(i);
+    pck_idx = new_bifurcation_idx(i);
     data_hwidth = 50;% initial peak width
     % initiate loop variables
     gof_n = 0;
@@ -175,7 +144,7 @@ for i = 1:length(new_new_bifurcation_idx)
         % reduce peak width 
         data_hwidth = data_hwidth - int;
         % normalise data window
-        x_data = mat2gray(sturct_to_save.tapering_raw_image.area_results.phyiscal_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
+        x_data = mat2gray(lumen_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
         % equally spaced values
         vals = [1:length(x_data)]';
         
@@ -203,16 +172,15 @@ end
 % disp(['Goodness of fit, rsquare = ', num2str(gof.rsquare)])
 
 %% extract all points not excluded
-logic_include = logical(ones(size(sturct_to_save.tapering_raw_image.area_results.phyiscal_area)));
+logic_include = logical(ones(size(lumen_area)));
 for i = 1:length(lower_exclude)
     logic_include(lower_exclude(i):upper_exclude(i)) = 0;
 end
-bi_removed_arcl = sturct_to_save.tapering_raw_image.arclegth(logic_include);
-bi_removed_area = sturct_to_save.tapering_raw_image.area_results.phyiscal_area(logic_include);
+bi_removed_arcl = arc_length(logic_include);
+bi_removed_area = lumen_area(logic_include);
 
 figure
-plot(sturct_to_save.tapering_raw_image.arclegth,...
-     sturct_to_save.tapering_raw_image.area_results.phyiscal_area, '.')
+plot(arc_length, lumen_area, '.')
 hold on
 plot(bi_removed_arcl, bi_removed_area, '.')
 xlabel('Arc Length (mm)')
