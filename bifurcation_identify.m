@@ -3,7 +3,7 @@
 % attempt to identify bifurcations from tapering segmentation.
 
 %% load tapering data & Segmentation
-load('P_N1_raw_image_CT_nifti_A_24287940.mat')
+load('P_N1_raw_image_CT_nifti_A_22195509.mat')
 segname = 'N1_raw_image_lumen_seg.nii';
 S = logical(niftiread(segname)); % NOTE upper and lower s, S
 s_raw = sturct_to_save.tapering_seg_image.resample_image;
@@ -111,7 +111,6 @@ for i = 1:length(bifurcation_idx)
 end
 
 %% visualise new peak bifurcations and original idx
-
 figure
 plot(arc_length,lumen_area)
 hold on
@@ -122,10 +121,9 @@ ylabel('Area (mm^2)')
 legend('Raw Area','new new Bifurcation Points')
 
 %% Remove Bifurcation Points
-
 % most computationally intensive.
-
-% extract points around first peak
+% add carina to be excluded.
+new_bifurcation_idx = [1 new_bifurcation_idx];
 %indices for exclusion between lower and upper point at each bifurcation.
 lower_exclude = zeros(size(new_bifurcation_idx));
 upper_exclude = zeros(size(new_bifurcation_idx));
@@ -134,17 +132,36 @@ for i = 1:length(new_bifurcation_idx)
     
     pck_idx = new_bifurcation_idx(i);
     try
-        data_hwidth = 50;% initial peak width
+        if i == 1
+            data_hwidth = 100;% initial peak width for carina
+        else
+            data_hwidth = 50;% initial peak width
+        end
         % initiate loop variables
         gof_n = 0;
         gof_np1 = 0.0001;
         int = 1; % inteval width reduction
-        x_data = mat2gray(lumen_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
+        lower_width = pck_idx-data_hwidth;
+        upper_width = pck_idx+data_hwidth;
+        % set precautions incase 1 < data width > last idx.
+        if lower_width < 1
+            lower_width = 1;
+        else
+        end
+        if upper_width > length(lumen_area)
+            upper_width = length(lumen_area);
+        else
+        end
+        x_data = mat2gray(lumen_area(lower_width:upper_width));
         [~, x_data_pck_idx] = max(x_data);
-
-        while x_data_pck_idx ~= data_hwidth+1
-            [~, x_data_pck_idx] = max(x_data);
-            data_hwidth = data_hwidth - int;
+        
+         % reduce data window if bifurcation is not the peak.
+        if i ~= 1
+            while x_data_pck_idx ~= data_hwidth+1
+                [~, x_data_pck_idx] = max(x_data);
+                data_hwidth = data_hwidth - int;
+            end
+        else
         end
 
         while gof_n < gof_np1 || gof_n < 0.2
@@ -155,29 +172,48 @@ for i = 1:length(new_bifurcation_idx)
                 n_vals = vals;
                 catch
             end
-            % reduce peak width 
-            data_hwidth = data_hwidth - int;
+            
             % normalise data window
-            x_data = mat2gray(lumen_area(pck_idx-data_hwidth:pck_idx+data_hwidth));
+            if lower_width < 1
+                lower_width = 1;
+            else
+            end
+            if upper_width > length(lumen_area)
+                upper_width = length(lumen_area);
+            else
+            end
+            x_data = mat2gray(lumen_area(lower_width:upper_width));
+            
             % equally spaced values
             vals = [1:length(x_data)]';
 
             % fit gaussian with fixed mean at centre
             options = fitoptions('gauss1');
-            options.Lower = [-inf data_hwidth+1 0];
-            options.Upper = [inf data_hwidth+1 inf];
+            if i == 1 % mean is 1 for carina
+                options.Lower = [-inf 1 0];
+                options.Upper = [inf 1 inf];
+            else
+                options.Lower = [-inf data_hwidth+1 0];
+                options.Upper = [inf data_hwidth+1 inf];
+            end
             [fitresult, gof] = fit(vals, x_data, 'gauss1', options);
-
+            
             % assign values for next loop
             gof_n = gof_np1; 
             gof_np1 = gof.rsquare;
-            %disp(data_hwidth);
-
+            % reduce peak width 
+            data_hwidth = data_hwidth - int;
+            lower_width = pck_idx-data_hwidth;
+            upper_width = pck_idx+data_hwidth;
         end
     catch
         n_data_hwidth = 3; % if fail to fit, remove 7 points around bifurcation
     end
-    lower_exclude(i) = pck_idx-n_data_hwidth;
+    if i == 1
+        lower_exclude(i) = 1;
+    else
+        lower_exclude(i) = pck_idx-n_data_hwidth;
+    end
     upper_exclude(i) = pck_idx+n_data_hwidth;
 end
 
@@ -195,6 +231,7 @@ end
 bi_removed_arcl = arc_length(logic_include);
 bi_removed_area = lumen_area(logic_include);
 
+%% visualise excluded and included points
 figure
 plot(arc_length, lumen_area, '.')
 hold on
@@ -203,82 +240,84 @@ xlabel('Arc Length (mm)')
 ylabel('Area (mm^2)')
 legend('Bifurcation Points','Non-Bifurcation points')
 
-%% Create global airway skeleton and convert to graph
-S_skel = bwskel(S);
 
-[SA,Snode,Slink] = Skel2Graph3D(S_skel,0); % dependent function
-SG = graph(SA);
 
-%% identify carina and terminal point node.
-% last node corresponds to top of trachea.
-carina_idx = neighbors(SG,length(SA)); % carina node
-all_term_idx = find([Snode.ep]);
-terminal_vox = [Snode(all_term_idx).idx]; % vox indicies of terminal points
-
-terminal_voxidx = find(terminal_vox == sturct_to_save.airway_number); % the idx for desired terminal
-terminal_idx = all_term_idx(terminal_voxidx);
-
-%% identify path of airway
-[P, d] = shortestpath(SG,carina_idx,terminal_idx);
-disp(d)
-disp(sturct_to_save.tapering_raw_image.arclegth(end))
-bifurcations = length(P) - 2; % first and last are terminal. 
-generation = bifurcations + 1;
-
-dist = zeros(length(P)-1, 1);
-for i = 1:length(P)-1
-    if i == 1
-        [~, dist(i)] = shortestpath(SG,P(i),P(i+1));
-    else
-        [~, dd] = shortestpath(SG,P(i),P(i+1));
-        dist(i) = dd+dist(i-1);
-    end
-end
-
-%dist = dist + 10;
-
-%% split taper data into segments
-
-%% Find path voxels
-voxel_in_path = [];
-for i = 1:length(P)-1
-    current_link = find([Slink.n1]== P(i+1) & [Slink.n2]== P(i) |...
-        [Slink.n1]== P(i) & [Slink.n2]== P(i+1));
-    voxel_in_path = cat(1,voxel_in_path, [Slink(current_link).point]');
-end
-
-[J,I,K] = ind2sub(size(S_skel), voxel_in_path); % flipped from skeleton for some reason
-
-%% Visualise path from graph on skeleton
-%path3D = zeros(size(skel));
-%path3D(voxel_in_path) = 1;
-
-[strstopJ, strstopI, strstopK] = ind2sub(size(S_skel),[Snode(carina_idx).idx, sturct_to_save.airway_number]);
-
-figure
-isosurface(S_skel)
-hold on
-plot3(I,J,K,'r.', 'MarkerSize',15)
-plot3(strstopI(1),strstopJ(1),strstopK(1),'mo','MarkerSize',20)
-plot3(strstopI(end),strstopJ(end),strstopK(end),'mo','MarkerSize',20)
-view(90,0)
-
-%% extract
-arc_length = sturct_to_save.tapering_raw_image.arclegth;
-area_info = sturct_to_save.tapering_raw_image.area_results;
-lumen_area = [area_info.phyiscal_area];
-wall_area = [area_info.phyiscal_area_wall];
-
-% ellipse, stored as (Cx, Cy, Rx, Ry, theta_radians)
-lumen_ellipse = {area_info.elliptical_info{:,1}}';
-wall_ellipse = {area_info.elliptical_info_wall{:,1}}';
-lumen_radius = zeros(2, numel(arc_length));
-wall_radius = zeros(2, numel(arc_length));
-for i = 1:numel(arc_length)
-    lumen_radius(1,i) = lumen_ellipse{i, 1}.elipllical_info(3);
-    lumen_radius(2,i) = lumen_ellipse{i, 1}.elipllical_info(4);
-    wall_radius(1,i) = wall_ellipse{i, 1}.elipllical_info(3);
-    wall_radius(2,i) = wall_ellipse{i, 1}.elipllical_info(4);
-end
-lumen_major = max(lumen_radius);
-wall_major = max(wall_radius);
+% %% Create global airway skeleton and convert to graph
+% S_skel = bwskel(S);
+% 
+% [SA,Snode,Slink] = Skel2Graph3D(S_skel,0); % dependent function
+% SG = graph(SA);
+% 
+% %% identify carina and terminal point node.
+% % last node corresponds to top of trachea.
+% carina_idx = neighbors(SG,length(SA)); % carina node
+% all_term_idx = find([Snode.ep]);
+% terminal_vox = [Snode(all_term_idx).idx]; % vox indicies of terminal points
+% 
+% terminal_voxidx = find(terminal_vox == sturct_to_save.airway_number); % the idx for desired terminal
+% terminal_idx = all_term_idx(terminal_voxidx);
+% 
+% %% identify path of airway
+% [P, d] = shortestpath(SG,carina_idx,terminal_idx);
+% disp(d)
+% disp(sturct_to_save.tapering_raw_image.arclegth(end))
+% bifurcations = length(P) - 2; % first and last are terminal. 
+% generation = bifurcations + 1;
+% 
+% dist = zeros(length(P)-1, 1);
+% for i = 1:length(P)-1
+%     if i == 1
+%         [~, dist(i)] = shortestpath(SG,P(i),P(i+1));
+%     else
+%         [~, dd] = shortestpath(SG,P(i),P(i+1));
+%         dist(i) = dd+dist(i-1);
+%     end
+% end
+% 
+% %dist = dist + 10;
+% 
+% %% split taper data into segments
+% 
+% %% Find path voxels
+% voxel_in_path = [];
+% for i = 1:length(P)-1
+%     current_link = find([Slink.n1]== P(i+1) & [Slink.n2]== P(i) |...
+%         [Slink.n1]== P(i) & [Slink.n2]== P(i+1));
+%     voxel_in_path = cat(1,voxel_in_path, [Slink(current_link).point]');
+% end
+% 
+% [J,I,K] = ind2sub(size(S_skel), voxel_in_path); % flipped from skeleton for some reason
+% 
+% %% Visualise path from graph on skeleton
+% %path3D = zeros(size(skel));
+% %path3D(voxel_in_path) = 1;
+% 
+% [strstopJ, strstopI, strstopK] = ind2sub(size(S_skel),[Snode(carina_idx).idx, sturct_to_save.airway_number]);
+% 
+% figure
+% isosurface(S_skel)
+% hold on
+% plot3(I,J,K,'r.', 'MarkerSize',15)
+% plot3(strstopI(1),strstopJ(1),strstopK(1),'mo','MarkerSize',20)
+% plot3(strstopI(end),strstopJ(end),strstopK(end),'mo','MarkerSize',20)
+% view(90,0)
+% 
+% %% extract
+% arc_length = sturct_to_save.tapering_raw_image.arclegth;
+% area_info = sturct_to_save.tapering_raw_image.area_results;
+% lumen_area = [area_info.phyiscal_area];
+% wall_area = [area_info.phyiscal_area_wall];
+% 
+% % ellipse, stored as (Cx, Cy, Rx, Ry, theta_radians)
+% lumen_ellipse = {area_info.elliptical_info{:,1}}';
+% wall_ellipse = {area_info.elliptical_info_wall{:,1}}';
+% lumen_radius = zeros(2, numel(arc_length));
+% wall_radius = zeros(2, numel(arc_length));
+% for i = 1:numel(arc_length)
+%     lumen_radius(1,i) = lumen_ellipse{i, 1}.elipllical_info(3);
+%     lumen_radius(2,i) = lumen_ellipse{i, 1}.elipllical_info(4);
+%     wall_radius(1,i) = wall_ellipse{i, 1}.elipllical_info(3);
+%     wall_radius(2,i) = wall_ellipse{i, 1}.elipllical_info(4);
+% end
+% lumen_major = max(lumen_radius);
+% wall_major = max(wall_radius);
