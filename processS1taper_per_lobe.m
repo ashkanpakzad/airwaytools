@@ -32,9 +32,9 @@ for j = 1:length(airway_number)
     %% remove bifurcations
     [logic_include, false_counter] = RemoveBifurcationPoints(removal, search_area, s_raw, lumen_area);
     
-    bi_removed_arcl git= arc_length(logic_include);
-    bi_removed_lumen_area = lumen_area(logic_include);
-    bi_removed_wall_area = wall_area(logic_include);
+%     bi_removed_arcl= arc_length(logic_include);
+%     bi_removed_lumen_area = lumen_area(logic_include);
+%     bi_removed_wall_area = wall_area(logic_include);
 
     %% fit petaperline
 %     [ log_taper_rate_lumen, log_taper_rate_wall ] =  ...
