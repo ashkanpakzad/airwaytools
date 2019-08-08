@@ -253,3 +253,31 @@ for j = 1:length(airway_number)
     save('M1_cleaned_data', 'M1_cleaned_data')
 end
 
+%% fit taper rate
+airway_number = [M1_cleaned_data(:).airway_number];
+for j = 1:length(airway_number)
+    disp(['airway ', num2str(j) ' of ' , num2str(length(airway_number))])
+    try
+        % load
+        arc_length = M1_cleaned_data(j).arc_length;
+        lumen_area = M1_cleaned_data(j).lumen_area;
+        wall_area = M1_cleaned_data(j).wall_area;
+        logic_include = M1_cleaned_data(j).nonbi_include;
+
+        disp('fitting taper rate')
+        [ log_taper_rate_lumen, log_taper_rate_wall ] =  ...
+        Log_taper_rate_of_ordered_array(arc_length(logic_include),lumen_area(logic_include),wall_area(logic_include));
+    
+        M1_cleaned_data(j).lumen_log_taper_rate = log_taper_rate_lumen;
+        M1_cleaned_data(j).wall_log_taper_rate = log_taper_rate_wall;
+    catch
+    end
+    if M1_cleaned_data(j).lumen_log_taper_rate == 0 || M1_cleaned_data(j).wall_log_taper_rate == 0
+        M1_cleaned_data(j).lumen_log_taper_rate = [];
+        M1_cleaned_data(j).wall_log_taper_rate = [];
+    end
+end
+
+%%
+save('M1_cleaned_data', 'M1_cleaned_data')
+
