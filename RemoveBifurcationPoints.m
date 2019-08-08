@@ -117,13 +117,7 @@ for i = 1:length(bifurcation_idx)
     try
         % consider if nearer peaks are more likely to rep. bifurcation
         [~, max_idx] = max(raw_pks(min_idx-search_area:min_idx+search_area));
-        if max_idx > search_area+1
-            idx = min_idx - search_area+1 + max_idx;
-        elseif max_idx < search_area+1
-            idx = min_idx - (search_area+1 - max_idx);
-        else
-            idx = min_idx;
-        end
+        idx = min_idx - (search_area+1 - max_idx);
     catch
          idx = min_idx;
     end
