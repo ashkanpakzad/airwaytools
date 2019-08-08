@@ -4,7 +4,7 @@ function [non_bi_points, new_bifurcation_idx, false_counter] = RemoveBifurcation
 %    remove carina from skeletisation of the tapering segmentation.
 %    recommend = 50.
 %    search_area = the half-width of peaks to consider when considering
-%    local area peaks as bifurcations. recommend = 4.
+%    local area peaks as bifurcations in units of 0.3mm. recommend = 7-9.
 %    s_raw = resampled segmentation from airway tapertool.
 %    lumen_area = array of lumen area from airway tapertool.
 
@@ -109,22 +109,43 @@ end
 
 function [new_bifurcation_idx] = FindBifurcationsPeak(lumen_area, bifurcation_idx, search_area)
 % identify bifurcations with local maxima peaks raw
-[raw_pks,raw_locs] = findpeaks(lumen_area);
-new_bifurcation_idx = zeros(size(bifurcation_idx));
-for i = 1:length(bifurcation_idx)
-    % identify nearest peak
-    [~, min_idx] = min(abs(raw_locs - bifurcation_idx(i)));
-    try
-        % consider if nearer peaks are more likely to rep. bifurcation
-        [~, max_idx] = max(raw_pks(min_idx-search_area:min_idx+search_area));
-        idx = min_idx - (search_area+1 - max_idx);
-    catch
-         idx = min_idx;
+[~,raw_locs] = findpeaks(lumen_area);
+temp_bifurcation_idx = zeros(size(bifurcation_idx));
+j = 0;
+while length(unique(temp_bifurcation_idx)) ~= length(temp_bifurcation_idx)
+    if j == 0 % first iteration
+        temp_bifurcation_idx = AssignBifurcations(bifurcation_idx, 1, 1);
+        j = j + 1;
+    else
+        % loop enters here if there are duplications
+        % find first non-unique bifurcation
+        [~, I] = unique(temp_bifurcation_idx, 'first');
+        x = 1:length(temp_bifurcation_idx);
+        x(I) = [];
+        temp_bifurcation_idx = AssignBifurcations(temp_bifurcation_idx, x(1), temp_bifurcation_idx(x(1)));
+        % reassign subsequent bifurcations preventing duplication from re-occuring
     end
-    raw_pks(idx) = 0; % prevents same peak being chosen twice.
-    new_bifurcation_idx(i) = raw_locs(idx);
-    % consider something here incase finding peak fails
+
 end
+new_bifurcation_idx = temp_bifurcation_idx;
+
+    function temp_bifurcation_idx = AssignBifurcations(bifurcation_idx, min_assign, disallowed)
+        temp_bifurcation_idx = bifurcation_idx;
+        % idx not allowed to be assigned, used to avoid duplications.
+        for i = min_assign:length(bifurcation_idx)
+        % identify nearby peaks within given search area
+        local_peak_locs = raw_locs(raw_locs > bifurcation_idx(i) - search_area & raw_locs < bifurcation_idx(i) + search_area);
+        local_peak_vals = lumen_area(local_peak_locs);
+        if ~isempty(find(local_peak_locs == disallowed,1))
+            local_peak_vals(local_peak_locs == disallowed) = 0;
+        else
+        end
+        % look for largest local peak
+        [~, max_idx] = max(local_peak_vals);
+        temp_bifurcation_idx(i) = local_peak_locs(max_idx); 
+        % consider something here incase finding peak fails
+        end
+    end
 end
 
 function non_bi_points = RemoveBifurcations(new_bifurcation_idx)
