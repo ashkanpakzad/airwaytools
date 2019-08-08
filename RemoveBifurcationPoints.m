@@ -1,4 +1,4 @@
-function [non_bi_points, false_counter] = RemoveBifurcationPoints(removal, search_area, s_raw, lumen_area)
+function [non_bi_points, new_bifurcation_idx, false_counter] = RemoveBifurcationPoints(removal, search_area, s_raw, lumen_area)
 %% INPUT
 %    removal = number of initial values to ignore in lumen area in order to
 %    remove carina from skeletisation of the tapering segmentation.
@@ -47,7 +47,7 @@ end
 
 %%
 
-function [bifurcation_idx,bifurcation_points,false_counter] = FindBifurcationsSkel(sG, snode, slink)
+function [bifurcation_idx,false_counter] = FindBifurcationsSkel(sG, snode, slink)
 % identify start and terminal node
 s_all_term_idx = find([snode.ep]);
 sK = ceil([snode(s_all_term_idx).comz]); % vox indicies of terminal points
@@ -207,8 +207,8 @@ for i = 1:length(new_bifurcation_idx)
                 options.Lower = [-inf data_hwidth+1 0];
                 options.Upper = [inf data_hwidth+1 inf];
             end
-            %[fitresult, gof] = fit(vals, x_data, 'gauss1', options);
-            [~, gof] = fit(vals, x_data, 'gauss1', options);
+            [fitresult, gof] = fit(vals, x_data, 'gauss1', options);
+            %[~, gof] = fit(vals, x_data, 'gauss1', options);
 
 
             % assign values for next loop
