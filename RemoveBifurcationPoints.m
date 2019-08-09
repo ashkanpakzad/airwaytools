@@ -117,6 +117,7 @@ while length(unique(temp_bifurcation_idx)) ~= length(temp_bifurcation_idx)
         temp_bifurcation_idx = AssignBifurcations(bifurcation_idx, 1, 1);
         j = j + 1;
     else
+        try
         % loop enters here if there are duplications
         % find first non-unique bifurcation
         [~, I] = unique(temp_bifurcation_idx, 'first');
@@ -124,6 +125,9 @@ while length(unique(temp_bifurcation_idx)) ~= length(temp_bifurcation_idx)
         x(I) = [];
         temp_bifurcation_idx = AssignBifurcations(temp_bifurcation_idx, x(1), temp_bifurcation_idx(x(1)));
         % reassign subsequent bifurcations preventing duplication from re-occuring
+        catch
+            break % if no other peaks available, keep duplicate.
+        end
     end
 
 end
@@ -134,16 +138,19 @@ new_bifurcation_idx = temp_bifurcation_idx;
         % idx not allowed to be assigned, used to avoid duplications.
         for i = min_assign:length(bifurcation_idx)
         % identify nearby peaks within given search area
-        local_peak_locs = raw_locs(raw_locs > bifurcation_idx(i) - search_area & raw_locs < bifurcation_idx(i) + search_area);
-        local_peak_vals = lumen_area(local_peak_locs);
-        if ~isempty(find(local_peak_locs == disallowed,1))
-            local_peak_vals(local_peak_locs == disallowed) = 0;
-        else
-        end
-        % look for largest local peak
-        [~, max_idx] = max(local_peak_vals);
-        temp_bifurcation_idx(i) = local_peak_locs(max_idx); 
-        % consider something here incase finding peak fails
+            try
+                local_peak_locs = raw_locs(raw_locs > bifurcation_idx(i) - search_area & raw_locs < bifurcation_idx(i) + search_area);
+                local_peak_vals = lumen_area(local_peak_locs);
+                if ~isempty(find(local_peak_locs == disallowed,1))
+                    local_peak_vals(local_peak_locs == disallowed) = 0;
+                else
+                end
+                [~, max_idx] = max(local_peak_vals);
+                % look for largest local peak
+                temp_bifurcation_idx(i) = local_peak_locs(max_idx);
+            catch
+                temp_bifurcation_idx(i) = bifurcation_idx; % if no local peaks available, keep original assignment.
+            end
         end
     end
 end
