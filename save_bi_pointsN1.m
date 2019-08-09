@@ -2,14 +2,18 @@
 % By Ashkan Pakzad on 30th July 2019
 
 %% input var
+data_file = fullfile('..','..','results',)
 prefix = 'P_N1_raw_image_CT_nifti_A_';
 % remove bronchi at carina
 removal = 50;
 search_area = 4; % for local maxima
+airway_number = [N1_cleaned_data(:).airway_number];
+
+%N1_cleaned_data(1).bi_loc = [];
 
 %% run loop to determine bifurcation data points
 
-for j = 1:length(airway_number)
+for j = 52:133
     disp(['airway ', num2str(j) ' of ' , num2str(length(airway_number))])
     try % incase airway missing
     %% load
@@ -71,6 +75,7 @@ for j = 1:length(airway_number)
     %% remove false bifurcations by analysing skeleton
     % Func. to find plausible bifurcations
     [true_bifurcations, ~] = Bifurcation_Plausibility(sP, snode, slink);
+    
     % extract plausible bifurcations
     sP_bi = sP(2:end-1); % removes start and end nodes
     sP_plaus = sP_bi(true_bifurcations);
@@ -97,13 +102,7 @@ for j = 1:length(airway_number)
         try
             % consider if nearer peaks are more likely to rep. bifurcation
             [~, max_idx] = max(raw_pks(min_idx-search_area:min_idx+search_area));
-            if max_idx > search_area+1
-                idx = min_idx - search_area+1 + max_idx;
-            elseif max_idx < search_area+1
-                idx = min_idx - (search_area+1 - max_idx);
-            else
-                idx = min_idx;
-            end
+            idx = min_idx - (search_area+1 - max_idx);
         catch
              idx = min_idx;
         end
@@ -124,5 +123,3 @@ for j = 1:length(airway_number)
     catch
     end
 end
-
-
