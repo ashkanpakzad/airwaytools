@@ -18,8 +18,7 @@ S = logical(niftiread(segname));
 %% Skeletonise lumen segmentation & graph it
 skel = bwskel(S);
 
-[A,node,link] = Skel2Graph3D(skel,0); % dependent function
-G = graph(A);
+[~,node,~] = Skel2Graph3D(skel,0); % dependent function
 
 %% Find carina
 % last node APPARENTLY corresponds to top of trachea.
