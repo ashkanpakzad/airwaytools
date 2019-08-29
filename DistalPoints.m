@@ -1,33 +1,45 @@
-% By Ashkan Pakzad 4th July 2019 (ashkan.pakzad.13@ucl.ac.uk)
+% By Ashkan Pakzad 4th July 2019 (ashkan.pakzad.13 (at) ucl.ac.uk)
 
-% function to mark the distal terminals of airways and save as nii for
-% provided segmentation name in .nii format.
+% Marks the distal terminals of airways and save as nii for
+% provided airway segmentation. 
+% Assumes the trachea is fully segmented (beyond the lungs) and at the top 
+% of the segmentation image.
 
-% I - segmentation file name
-%   - desired name for new distal array saved as .nii
-%   - number of terminal points to use. 0 for all.
+% DEPENDANCY:
+%   Skel2Graph3D: https://github.com/phi-max/skel2graph3d-matlab
 
-% example use:
-% DistalPoints('N1_airway.nii.gz','test_distal',3)
+% INPUT 
+%   segname: segmentation file name
+%   distalname: desired name for new distal array saved as .nii
+%   branch_threshold: for input to skel2graph3D, set the minimum branch
+%   length that should be considered. (used to prevent false branches)
+%   n: number of terminal points to consider. 
+%       (set low for testing, otherwise set 0 for all airways.)
+% OUTPUT
+%   binary nifti image with terminals labelled as 1.
 
-function DistalPoints(segname,distalname,n)
+% EXAMPLE USE:
+%   create a distal.nii image based on airway segmentation called
+%   airway_seg.nii. Consider every branch and only return the first three
+%   distal points.
+% DistalPoints('airway_seg.nii','distal',0,3)
 
-%% Load data
+function DistalPoints(segname,distalname,branch_threshold,n)
+
+%% Load segmentation
 S = logical(niftiread(segname));
 
 %% Skeletonise lumen segmentation & graph it
 skel = bwskel(S);
 
-[~,node,~] = Skel2Graph3D(skel,0); % dependent function
-
-%% Find carina
-% last node APPARENTLY corresponds to top of trachea.
-%C_Gidx = neighbors(G,length(A)); % carina node
+[~,node,~] = Skel2Graph3D(skel,branch_threshold); % dependent function
 
 %% identify terminal points
 terminal_idx = find([node.ep]);
 
 % remove trachea
+[~, trachea_idx] = min([node(terminal_idx).comz]);
+terminal_idx(terminal_idx == trachea_idx) = 0;
 terminal_idx = terminal_idx(1:end-1);
 
 if n ~= 0
@@ -51,21 +63,3 @@ distal(flip_terms) = 1;
 
 %% Save distal logical array
 niftiwrite(double(distal), distalname)
-
-%% visualise Graph plot
-
-% figure
-% G = graph(A);
-% h = plot(G);
-% highlight(h, C_Gidx); % highlight carina
-% highlight(h, terminal_idx); % highlight carina
-
-%% visualise terminal points
-% [I,J,K]=ind2sub(size(distal),terminal_vox);
-% 
-% figure
-% isosurface(S)
-% hold on
-% plot3(J,I,K,'.r','MarkerSize',16) % nb swap of axes for visualisation
-
-
